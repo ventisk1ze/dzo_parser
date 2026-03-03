@@ -31,16 +31,10 @@ class OtzyvParser(Parser):
     name = 'otzyvpro'
     link = 'https://otzyv.pro/'
 
-    def __init__(self, date_range=Optional[Tuple]):
+    def __init__(self, date_range: Optional[Tuple] = None):
         self.driver = super().get_driver()
         self.wait = WebDriverWait(self.driver, 60)
         self.ac = ActionChains(self.driver)
-
-        try:
-            self.date_start = datetime.fromisoformat(date_range[0])
-            self.date_finish = datetime.fromisoformat(date_range[1])
-        except ValueError:
-            print('Invalid String')
 
     def save_to_html(self):
         """
