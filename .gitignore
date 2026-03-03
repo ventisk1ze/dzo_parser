@@ -1,0 +1,6 @@
+*.html
+*.json
+venv/
+__pycache__/
+.vscode
+.DS_Store
