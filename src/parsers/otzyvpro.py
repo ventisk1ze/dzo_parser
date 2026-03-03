@@ -1,5 +1,7 @@
 import re
 import uuid
+import itertools
+from typing import List, Dict, Tuple, Optional
 from datetime import datetime
 from dataclasses import asdict
 from selenium.webdriver.common.by import By
@@ -28,13 +30,17 @@ months = {
 class OtzyvParser(Parser):
     name = 'otzyvpro'
     link = 'https://otzyv.pro/'
-    search_request = 'Сбер'
 
-    def __init__(self, date_range=None):
+    def __init__(self, date_range=Optional[Tuple]):
         self.driver = super().get_driver()
-        self.date_range = date_range
         self.wait = WebDriverWait(self.driver, 60)
         self.ac = ActionChains(self.driver)
+
+        try:
+            self.date_start = datetime.fromisoformat(date_range[0])
+            self.date_finish = datetime.fromisoformat(date_range[1])
+        except ValueError:
+            print('Invalid String')
 
     def save_to_html(self):
         """
@@ -43,29 +49,32 @@ class OtzyvParser(Parser):
         with open('page.html', 'w', encoding='utf8') as f:
             f.write(self.driver.page_source)
     
-    def _scrape(self):
+    def _scrape(self, search_request='Сбер'):
         self.driver.get(self.link)
-        self.__send_search_request()
+        self.__send_search_request(search_request)
 
         reviews = []
 
         content = self.__get_initial_content()
         
+        processed_links = []
+        
         shortstories = content.find_elements(By.TAG_NAME, 'article')
         for i, ss in enumerate(shortstories):
-            # self.ac.move_to_element(ss)
-            # self.wait.until(EC.visibility_of_element_located((By.TAG_NAME, 'a')))
             print(f'processing {i}')
             try:
                 link_tag = ss.find_element(By.TAG_NAME, 'a')
             except StaleElementReferenceException:
-                self.__send_search_request()
+                self.__send_search_request(search_request)
                 link_tag = self.__get_initial_content().find_elements(By.TAG_NAME, 'article')[i].find_element(By.TAG_NAME, 'a')
             if not re.findall(r'Сбер', link_tag.text):
                 continue
 
+            if link_tag.text not in processed_links:
+                processed_links.append(link_tag.text)
+            else:
+                continue
             link_tag.click()
-            # self.wait.until(EC.visibility_of_element_located((By.CLASS_NAME, 'reviews')))
             page_reviews = self.driver.find_elements(By.CLASS_NAME, 'reviews')
             for review in [pr for pr in page_reviews if 'reviews' in pr.get_attribute('id')]:
                 clicked = False
@@ -109,16 +118,22 @@ class OtzyvParser(Parser):
                         full_text,
                         datetime.strftime(datetime.now().date(), '%Y-%m-%d'),
                         author,
-                        'address',
+                        '',
                         rating,
                         responses,
-                        'Сбер',
+                        search_request,
                         ''
                     )
                 )
             self.driver.back()
         return [asdict(review) for review in reviews]
 
+    def parse(self) -> List[Dict]:
+        with open('dzo.txt', 'r', encoding='utf8') as f:
+            dzo = f.readlines()
+        
+        return itertools.chain([self._scrape(d) for d in dzo])
+    
     def __get_initial_content(self):
         return self.driver.find_element(By.ID, 'dle-content')
     
@@ -137,17 +152,10 @@ class OtzyvParser(Parser):
         style = rating_element.get_attribute('style')
         return int(style.split(' ')[-1].replace('%', '').replace(';', '')) // 20
     
-    def __get_likes(self, review_element: WebElement):
-        # like_element = review_element.find_element(By.CLASS_NAME, 'text_reck')
-        self.wait.until(EC.visibility_of_element_located((By.CLASS_NAME, 'num')))
-        return int(review_element.find_element(By.CLASS_NAME, 'recommend_plus').text.replace('+', ''))
-    
-    def __send_search_request(self):
-        # self.wait.until(EC.visibility_of_element_located((By.TAG_NAME, 'form')))
+    def __send_search_request(self, search_request):
         sb = self.driver.find_element(By.CLASS_NAME, 'search-box')
         form = sb.find_element(By.ID, 'story')
-        form.send_keys(self.search_request)
-        # self.wait.until(EC.visibility_of_element_located((By.TAG_NAME, 'button')))
+        form.send_keys(search_request)
         for element in sb.find_elements(By.TAG_NAME, 'button'):
             if element.get_attribute('type') == 'submit':
                 element.click()
