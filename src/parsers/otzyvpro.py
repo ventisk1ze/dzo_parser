@@ -35,6 +35,7 @@ class OtzyvParser(Parser):
         self.driver = super().get_driver()
         self.wait = WebDriverWait(self.driver, 60)
         self.ac = ActionChains(self.driver)
+        self.date_range = date_range
 
     def save_to_html(self):
         """
@@ -81,6 +82,12 @@ class OtzyvParser(Parser):
                     .find_element(By.TAG_NAME, 'a') \
                     .click()
                     clicked = True
+                
+                if not super()._in_date_range(date):
+                    if clicked:
+                        self.driver.back()
+                    continue
+                
                 full_text = self.__get_full_text()
                 title = self.__get_title()
                 author = self.driver.find_element(By.CLASS_NAME, 'user-name').text
