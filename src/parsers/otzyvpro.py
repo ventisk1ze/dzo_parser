@@ -1,6 +1,7 @@
 import re
 import uuid
 import itertools
+import pandas as pd
 from typing import List, Dict, Tuple, Optional
 from datetime import datetime
 from dataclasses import asdict
@@ -31,11 +32,12 @@ class OtzyvParser(Parser):
     name = 'otzyvpro'
     link = 'https://otzyv.pro/'
 
-    def __init__(self, date_range: Optional[Tuple] = None):
+    def __init__(self, date_range: Optional[Tuple] = None, debug: bool = False):
         self.driver = super().get_driver()
         self.wait = WebDriverWait(self.driver, 60)
         self.ac = ActionChains(self.driver)
         self.date_range = date_range
+        self.debug = debug
 
     def save_to_html(self):
         """
@@ -133,7 +135,12 @@ class OtzyvParser(Parser):
         with open('dzo.txt', 'r', encoding='utf8') as f:
             dzo = f.readlines()
         
-        return itertools.chain([self._scrape(d) for d in dzo])
+        if self.debug:
+            dzo=['Сбер']
+
+        parsed = list(itertools.chain([self._scrape(d) for d in dzo]))
+
+        return pd.DataFrame.from_records(parsed)
     
     def __get_initial_content(self):
         return self.driver.find_element(By.ID, 'dle-content')
